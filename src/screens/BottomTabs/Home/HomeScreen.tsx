@@ -14,6 +14,7 @@ const HomeScreen = () => {
   const { token, user } = useAppSelector(state => state.auth);
   const [openSelectRoute, setOpenSelectRoute] = useState<boolean>(false);
   const [isStart, setIsStart] = useState<boolean>(false);
+  const [location, setLocation] = useState<Location.LocationObjectCoords>();
   const [route, setRoute] = useState<string>();
   const [locationWatcher, setLocationWatcher] =
     useState<Location.LocationSubscription>();
@@ -95,6 +96,7 @@ const HomeScreen = () => {
       },
       position => {
         const { latitude, longitude } = position.coords;
+        setLocation(position.coords);
         socket.emit("locationupdate", {
           busId: route,
           location: {
@@ -187,6 +189,18 @@ const HomeScreen = () => {
               showsUserLocation
               followsUserLocation
               minZoomLevel={5}
+              initialRegion={{
+                latitude: 37.5665,
+                longitude: 126.978,
+                latitudeDelta: 0.0122,
+                longitudeDelta: 0.0121,
+              }}
+              region={{
+                latitude: location?.latitude || 37.5665,
+                longitude: location?.longitude || 126.978,
+                latitudeDelta: 0.0122,
+                longitudeDelta: 0.0121,
+              }}
             />
           </View>
         </>
