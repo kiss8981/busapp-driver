@@ -13,6 +13,7 @@ const HomeScreen = () => {
   const [isConnected, setIsConnected] = useState<boolean>(false);
   const { token, user } = useAppSelector(state => state.auth);
   const [openSelectRoute, setOpenSelectRoute] = useState<boolean>(false);
+  const [tryReconnect, setTryReconnect] = useState<boolean>(false);
   const [isStart, setIsStart] = useState<boolean>(false);
   const [location, setLocation] = useState<Location.LocationObjectCoords>();
   const [route, setRoute] = useState<string>();
@@ -39,21 +40,6 @@ const HomeScreen = () => {
   }, []);
 
   useEffect(() => {
-    if (!isConnected) {
-      socket.connect();
-      socket.emit("authenticate", {
-        provider: user.provider,
-        token: token.access,
-      });
-    }
-  }, [isConnected]);
-
-  useEffect(() => {
-    socket.emit("authenticate", {
-      provider: user.provider,
-      token: token.access,
-    });
-
     socket.on("authenticate", data => {
       const { data: response } = JSON.parse(data);
       if (typeof response == "boolean" && !response) {
@@ -62,20 +48,51 @@ const HomeScreen = () => {
           text1: "인증 실패",
           text2: "유저 정보를 불러오지 못했습니다. 다시 로그인 해주세요.",
         });
-      } else {
         setIsConnected(true);
+      } else {
+        Toast.show({
+          type: "success",
+          text1: "연결성공",
+          text2: "서버 연결에 성공했습니다.",
+        });
       }
+    });
+
+    socket.emit("authenticate", {
+      provider: user.provider,
+      token: token.access,
     });
 
     socket.on("disconnect", () => {
       Toast.show({
         type: "error",
         text1: "서버 연결 끊김",
-        text2: "서버와 연결이 끊겼습니다. 앱을 다시 실행해주세요.",
+        text2: "서버와 연결이 끊겼습니다. 다시 연결합니다.",
       });
       setIsConnected(false);
+      setTryReconnect(true);
+    });
+
+    socket.on("connect", () => {
+      socket.emit("authenticate", {
+        provider: user.provider,
+        token: token.access,
+      });
     });
   }, []);
+
+  useEffect(() => {
+    if (tryReconnect) {
+      socket.connect();
+    }
+  }, [tryReconnect, socket.connected]);
+
+  useEffect(() => {
+    if (!isConnected) {
+      socket.connect();
+    }
+  }, [isConnected]);
+
   const startBusrun = async () => {
     if (!route) {
       Toast.show({
@@ -90,9 +107,9 @@ const HomeScreen = () => {
 
     const watchpos = await Location.watchPositionAsync(
       {
-        accuracy: Location.Accuracy.Balanced,
-        timeInterval: 1000,
-        distanceInterval: 10,
+        accuracy: Location.Accuracy.High,
+        timeInterval: 500,
+        distanceInterval: 5,
       },
       position => {
         const { latitude, longitude } = position.coords;
@@ -130,92 +147,77 @@ const HomeScreen = () => {
 
   return (
     <>
-      {isConnected ? (
-        <>
-          <View
-            style={{
-              flex: 1,
-              backgroundColor: "#fff",
-              paddingTop: 15,
-            }}
-          >
-            <View
-              style={{
-                paddingHorizontal: 15,
-                zIndex: 10,
-                marginTop: "auto",
-              }}
-            >
-              <DropDownPicker
-                listMode="SCROLLVIEW"
-                open={openSelectRoute}
-                disabled={isStart}
-                multiple={false}
-                style={
-                  isStart
-                    ? {
-                        ...styles.selectBox,
-                        backgroundColor: "#f5f5f5",
-                      }
-                    : styles.selectBox
-                }
-                value={route as string}
-                items={user.routes.map(item => {
-                  return {
-                    label: item.name,
-                    value: item.id,
-                  };
-                })}
-                dropDownContainerStyle={styles.selctBoxStyle}
-                setOpen={setOpenSelectRoute}
-                setValue={setRoute}
-                placeholder={"운행할 노선을 선택해주세요."}
-              />
-            </View>
-            <TouchableOpacity
-              style={styles.button}
-              onPress={isStart ? stopBusrun : startBusrun}
-            >
-              {isStart ? <Text>운행 종료</Text> : <Text>운행 시작</Text>}
-            </TouchableOpacity>
-
-            <MapView
-              provider="google"
-              style={{
-                width: "100%",
-                height: "70%",
-                marginTop: "auto",
-              }}
-              showsUserLocation
-              followsUserLocation
-              minZoomLevel={5}
-              initialRegion={{
-                latitude: 37.5665,
-                longitude: 126.978,
-                latitudeDelta: 0.0122,
-                longitudeDelta: 0.0121,
-              }}
-              region={{
-                latitude: location?.latitude || 37.5665,
-                longitude: location?.longitude || 126.978,
-                latitudeDelta: 0.0122,
-                longitudeDelta: 0.0121,
-              }}
-            />
-          </View>
-        </>
-      ) : (
-        <>
-          <ActivityIndicator
-            size="large"
-            style={{
-              flex: 1,
-              justifyContent: "center",
-              alignItems: "center",
-            }}
+      <View
+        style={{
+          flex: 1,
+          backgroundColor: "#fff",
+          paddingTop: 15,
+        }}
+      >
+        <View
+          style={{
+            paddingHorizontal: 15,
+            zIndex: 10,
+            marginTop: "auto",
+          }}
+        >
+          <DropDownPicker
+            listMode="SCROLLVIEW"
+            open={openSelectRoute}
+            disabled={isStart}
+            multiple={false}
+            style={
+              isStart
+                ? {
+                    ...styles.selectBox,
+                    backgroundColor: "#f5f5f5",
+                  }
+                : styles.selectBox
+            }
+            value={route as string}
+            items={user.routes.map(item => {
+              return {
+                label: item.name,
+                value: item.id,
+              };
+            })}
+            dropDownContainerStyle={styles.selctBoxStyle}
+            setOpen={setOpenSelectRoute}
+            setValue={setRoute}
+            placeholder={"운행할 노선을 선택해주세요."}
           />
-        </>
-      )}
+        </View>
+        <TouchableOpacity
+          style={styles.button}
+          onPress={isStart ? stopBusrun : startBusrun}
+        >
+          {isStart ? <Text>운행 종료</Text> : <Text>운행 시작</Text>}
+        </TouchableOpacity>
+
+        <MapView
+          provider="google"
+          style={{
+            width: "100%",
+            height: "70%",
+            marginTop: "auto",
+          }}
+          showsUserLocation
+          followsUserLocation
+          minZoomLevel={5}
+          initialRegion={{
+            latitude: 37.5665,
+            longitude: 126.978,
+            latitudeDelta: 0.0122,
+            longitudeDelta: 0.0121,
+          }}
+          region={{
+            latitude: location?.latitude || 37.5665,
+            longitude: location?.longitude || 126.978,
+            latitudeDelta: 0.0122,
+            longitudeDelta: 0.0121,
+          }}
+        />
+      </View>
     </>
   );
 };
