@@ -112,6 +112,10 @@ const HomeScreen = () => {
         distanceInterval: 5,
       },
       position => {
+        if (!isConnected || !socket.connected) {
+          socket.connect();
+        }
+
         const { latitude, longitude } = position.coords;
         setLocation(position.coords);
         socket.emit("locationupdate", {
