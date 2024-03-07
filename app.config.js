@@ -2,7 +2,7 @@ export default {
   expo: {
     name: "스쿨버스 기사님",
     slug: "busdriver",
-    version: "1.0.3",
+    version: "1.0.4",
     orientation: "portrait",
     icon: "./assets/icon.png",
     userInterfaceStyle: "light",
@@ -15,7 +15,7 @@ export default {
     ios: {
       supportsTablet: false,
       bundleIdentifier: "kr.codest.busdriver",
-      buildNumber: "1.0.3",
+      buildNumber: "1.0.4",
       infoPlist: {
         NSLocationAlwaysUsageDescription:
           "버스 위치 정보 공유를 위해 사용자의 위치 정보에 접근합니다.",
@@ -34,7 +34,7 @@ export default {
         backgroundColor: "#ffffff",
       },
       package: "kr.codest.busdriver",
-      versionCode: 4,
+      versionCode: 5,
       permissions: [
         "ACCESS_COARSE_LOCATION",
         "ACCESS_FINE_LOCATION",
