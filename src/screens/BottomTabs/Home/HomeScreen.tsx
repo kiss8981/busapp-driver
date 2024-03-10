@@ -17,8 +17,9 @@ const HomeScreen = () => {
   const [isStart, setIsStart] = useState<boolean>(false);
   const [location, setLocation] = useState<Location.LocationObjectCoords>();
   const [route, setRoute] = useState<string>();
-  const [locationWatcher, setLocationWatcher] =
-    useState<Location.LocationSubscription>();
+  const [locationWatcher, setLocationWatcher] = useState<NodeJS.Timeout | null>(
+    null
+  );
 
   useEffect(() => {
     (async () => {
@@ -105,30 +106,30 @@ const HomeScreen = () => {
     setIsStart(true);
     activateKeepAwakeAsync();
 
-    const watchpos = await Location.watchPositionAsync(
-      {
-        accuracy: Location.Accuracy.High,
-        timeInterval: 500,
-        distanceInterval: 5,
-      },
-      position => {
-        if (!isConnected || !socket.connected) {
-          socket.connect();
-        }
-
-        const { latitude, longitude } = position.coords;
-        setLocation(position.coords);
-        socket.emit("locationupdate", {
-          busId: route,
-          location: {
-            latitude,
-            longitude,
-          },
-        });
+    const watcher = setInterval(async () => {
+      if (!isConnected || !socket.connected) {
+        socket.connect();
       }
-    );
 
-    setLocationWatcher(watchpos);
+      const nowLocation = await Location.getCurrentPositionAsync({
+        accuracy: Location.Accuracy.High,
+      });
+
+      const {
+        coords: { latitude, longitude },
+      } = nowLocation;
+
+      setLocation(nowLocation.coords);
+      socket.emit("locationupdate", {
+        busId: route,
+        location: {
+          latitude,
+          longitude,
+        },
+      });
+    }, 4000);
+
+    setLocationWatcher(watcher);
 
     Toast.show({
       type: "success",
@@ -138,7 +139,9 @@ const HomeScreen = () => {
   };
 
   const stopBusrun = () => {
-    locationWatcher?.remove();
+    if (locationWatcher) {
+      clearInterval(locationWatcher);
+    }
     setIsStart(false);
     deactivateKeepAwake();
 
