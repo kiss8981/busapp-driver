@@ -8,6 +8,58 @@ import styles from "./styles";
 import DropDownPicker from "react-native-dropdown-picker";
 import * as Location from "expo-location";
 import MapView from "react-native-maps";
+import type { LocationObject } from "expo-location";
+import type { TaskManagerError } from "expo-task-manager";
+import * as TaskManager from "expo-task-manager";
+import * as SecureStore from "expo-secure-store";
+import { fetcher } from "../../../utils/fetcher";
+import { AxiosError } from "axios";
+
+const TASK_FETCH_LOCATION = "TASK_FETCH_LOCATION";
+
+TaskManager.defineTask(
+  TASK_FETCH_LOCATION,
+  async ({
+    data: { locations },
+    error,
+  }: {
+    data: {
+      locations: LocationObject[];
+    };
+    error?: TaskManagerError | null;
+  }) => {
+    if (error) {
+      console.error(error);
+      return;
+    }
+    const accessToken = await SecureStore.getItemAsync("accessToken");
+    const route = await SecureStore.getItemAsync("route");
+    const providerId = await SecureStore.getItemAsync("providerId");
+
+    const [location] = locations;
+    try {
+      await fetcher.post(
+        "/bus/location",
+        {
+          location: {
+            latitude: String(location.coords.latitude),
+            longitude: String(location.coords.longitude),
+          },
+          providerId: providerId,
+          busId: route,
+        },
+        {
+          headers: {
+            Authorization: accessToken,
+          },
+        }
+      ); // you should use post instead of get to persist data on the backend
+    } catch (err) {
+      const error = err as AxiosError;
+      console.error(error);
+    }
+  }
+);
 
 const HomeScreen = () => {
   const [isConnected, setIsConnected] = useState<boolean>(false);
@@ -26,8 +78,17 @@ const HomeScreen = () => {
       try {
         const { granted: foregroundGranted } =
           await Location.requestForegroundPermissionsAsync();
-
+        const { granted: backgroundGranted } =
+          await Location.requestBackgroundPermissionsAsync();
         if (!foregroundGranted) {
+          Toast.show({
+            type: "error",
+            text1: "위치 권한",
+            text2: "셔틀버스 위치 제공을 위해 위치 권한이 필요합니다.",
+          });
+        }
+
+        if (!backgroundGranted) {
           Toast.show({
             type: "error",
             text1: "위치 권한",
@@ -94,6 +155,23 @@ const HomeScreen = () => {
     }
   }, [isConnected]);
 
+  const startLocationFetchBackground = async () => {
+    await Location.startLocationUpdatesAsync(TASK_FETCH_LOCATION, {
+      accuracy: Location.Accuracy.High,
+      timeInterval: 5000,
+      distanceInterval: 10,
+      foregroundService: {
+        notificationTitle: "셔틀버스 위치 제공 중",
+        notificationBody:
+          "셔틀버스 위치를 제공 중입니다. 운행 종료 시 중지해주세요.",
+      },
+    });
+  };
+
+  const stopLocationFetchBackground = async () => {
+    await Location.stopLocationUpdatesAsync(TASK_FETCH_LOCATION);
+  };
+
   const startBusrun = async () => {
     if (!route) {
       Toast.show({
@@ -105,6 +183,11 @@ const HomeScreen = () => {
     }
     setIsStart(true);
     activateKeepAwakeAsync();
+
+    await SecureStore.setItemAsync("route", route);
+    await SecureStore.setItemAsync("providerId", user.provider!);
+
+    startLocationFetchBackground();
 
     const watcher = setInterval(async () => {
       if (!isConnected || !socket.connected) {
@@ -144,6 +227,7 @@ const HomeScreen = () => {
     }
     setIsStart(false);
     deactivateKeepAwake();
+    stopLocationFetchBackground();
 
     Toast.show({
       type: "success",
