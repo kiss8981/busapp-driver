@@ -13,8 +13,16 @@ import { fetchAuth } from "./src/store/slices/authSlice";
 import Toast from "react-native-toast-message";
 import type { NavigationContainerRef } from "@react-navigation/native";
 import type { StackNavigator as StackNavigatorTypes } from "./src/types/Navigator";
+import * as Notifications from "expo-notifications";
 
 SplashScreen.preventAutoHideAsync();
+Notifications.setNotificationHandler({
+  handleNotification: async () => ({
+    shouldShowAlert: true,
+    shouldPlaySound: false,
+    shouldSetBadge: false,
+  }),
+});
 
 function AppSplashScreen() {
   const [appIsReady, setAppIsReady] = useState(false);

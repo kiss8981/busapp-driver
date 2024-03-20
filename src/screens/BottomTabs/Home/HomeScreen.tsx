@@ -14,6 +14,7 @@ import * as TaskManager from "expo-task-manager";
 import * as SecureStore from "expo-secure-store";
 import { fetcher } from "../../../utils/fetcher";
 import { AxiosError } from "axios";
+import * as Notifications from "expo-notifications";
 
 const TASK_FETCH_LOCATION = "TASK_FETCH_LOCATION";
 
@@ -80,6 +81,21 @@ const HomeScreen = () => {
           await Location.requestForegroundPermissionsAsync();
         const { granted: backgroundGranted } =
           await Location.requestBackgroundPermissionsAsync();
+
+        const { granted: notificationGranted } =
+          await Notifications.requestPermissionsAsync({
+            ios: {
+              allowAlert: true,
+              allowBadge: true,
+              allowSound: true,
+            },
+            android: {
+              allowAlert: true,
+              allowBadge: true,
+              allowSound: true,
+            },
+          });
+
         if (!foregroundGranted) {
           Toast.show({
             type: "error",
@@ -93,6 +109,14 @@ const HomeScreen = () => {
             type: "error",
             text1: "위치 권한",
             text2: "셔틀버스 위치 제공을 위해 위치 권한이 필요합니다.",
+          });
+        }
+
+        if (!notificationGranted) {
+          Toast.show({
+            type: "error",
+            text1: "알림 권한",
+            text2: "셔틀버스 운행 여부를 알리기 위해 알림 권한이 필요합니다.",
           });
         }
       } catch (e) {
@@ -157,13 +181,14 @@ const HomeScreen = () => {
 
   const startLocationFetchBackground = async () => {
     await Location.startLocationUpdatesAsync(TASK_FETCH_LOCATION, {
-      accuracy: Location.Accuracy.High,
+      accuracy: Location.Accuracy.Highest,
       timeInterval: 5000,
       distanceInterval: 10,
       foregroundService: {
         notificationTitle: "셔틀버스 위치 제공 중",
         notificationBody:
           "셔틀버스 위치를 제공 중입니다. 운행 종료 시 중지해주세요.",
+        killServiceOnDestroy: true,
       },
     });
   };
